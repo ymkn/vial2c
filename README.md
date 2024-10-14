@@ -12,7 +12,7 @@ keymap_c_contents = vial2c(vil_contents);
 
 http://ymkn.github.io/vial2c/
 
-source: http://github.com/ymkn/index.html
+source: https://github.com/ymkn/vial2c/blob/main/index.html
 
 ## LICENSE
 
