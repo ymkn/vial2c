@@ -5,7 +5,8 @@ A Javascript function to convert the contents of a Vial layout file (.vil) into 
 ## Usage
 
 ~~~
-keymap_c_contents = vial2c(vil_contents);
+vil_json = JSON.parse(vil_contents);
+keymap_c_contents = vial2c(vil_json);
 ~~~
 
 ## Demo
