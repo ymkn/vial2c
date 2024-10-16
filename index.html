@@ -18,13 +18,15 @@
             margin: 10px 0;
         }
         textarea[readonly] {
-          background-color: gainsboro;
+            background-color: gainsboro;
         }
         button {
             padding: 10px 20px;
             font-size: 16px;
         }
     </style>
+    <link href="https://use.fontawesome.com/releases/v6.2.0/css/all.css" rel="stylesheet">
+
 </head>
 <body>
     <h1>Vial2C Converter</h1>
@@ -38,7 +40,8 @@
             const input = document.getElementById('input').value;
             const output = document.getElementById('output');
             try {
-                const result = vial2c(input);
+                const json = JSON.parse(input);
+                const result = vial2c(json);
                 if (result == null) throw new Error("Invalid .vil contents");
                 output.value = result;
             } catch (error) {
@@ -46,5 +49,6 @@
             }
         }
     </script>
+    <p><a href="https://github.com/ymkn/vial2c"><i class="fa-brands fa-github"></i> GitHub</a></p>
 </body>
 </html>
