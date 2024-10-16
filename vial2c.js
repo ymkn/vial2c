@@ -1,13 +1,5 @@
-// vial2c.js
-// Convert layouts definitions in .vil file to keymap.c style for QMK 
-//
-// Copyright 2024 @ymkn
-// LICENSE: MIT
-
-// Generated from https://github.com/vial-kb/vial-gui/blob/main/src/main/python/keycodes/keycodes.py
-// Vial uses incompatible keycodes with the QMK using, so we need translate it...
 const KC_ALIASES = {
-//  "KC_TRNS": "KC_TRANSPARENT",
+  //  "KC_TRNS": "KC_TRANSPARENT",
   "KC_NUMLOCK": "KC_NLCK",
   "KC_KP_SLASH": "KC_PSLS",
   "KC_KP_ASTERISK": "KC_PAST",
@@ -53,11 +45,11 @@ const KC_ALIASES = {
   "KC_LCTRL": "KC_LCTL",
   "KC_LSHIFT": "KC_LSFT",
   "KC_LALT": "KC_LOPT",
-//  "KC_LGUI": "KC_LCMD", "KC_LWIN",
+  //  "KC_LGUI": "KC_LCMD", "KC_LWIN",
   "KC_RCTRL": "KC_RCTL",
   "KC_RSHIFT": "KC_RSFT",
-//  "KC_RALT": "KC_ALGR", "KC_ROPT",
-//  "KC_RGUI": "KC_RCMD", "KC_RWIN",
+  //  "KC_RALT": "KC_ALGR", "KC_ROPT",
+  //  "KC_RGUI": "KC_RCMD", "KC_RWIN",
   "KC_NONUS_HASH": "KC_NUHS",
   "KC_NONUS_BSLASH": "KC_NUBS",
   "KC_RO": "KC_INT1",
@@ -74,6 +66,7 @@ const KC_ALIASES = {
   "KC_LANG7": "KC_LNG7",
   "KC_LANG8": "KC_LNG8",
   "KC_LANG9": "KC_LNG9",
+  /* no need to translate
   "KC_PWR": "KC_SYSTEM_POWER",
   "KC_SLEP": "KC_SYSTEM_SLEEP",
   "KC_WAKE": "KC_SYSTEM_WAKE",
@@ -122,54 +115,63 @@ const KC_ALIASES = {
   "KC_LCAP": "KC_LOCKING_CAPS",
   "KC_LNUM": "KC_LOCKING_NUM",
   "KC_LSCR": "KC_LOCKING_SCROLL"
+  */
 };
 
-function vial2c(vilString) {
-  try {
-    const json = JSON.parse(vilString);
+const KC_PATTERN = '(KC_[A-Z0-9_]+)';
 
-    var rets = [];
+const keyCodePattern = [
+  { pattern: new RegExp(KC_PATTERN), result: (p1) => resolveAlias(p1) },
+  { pattern: new RegExp(`^C_S\\(${KC_PATTERN}\\)`), result: (p1) => `LCTL(LSFT(${p1}))`},
+  { pattern: new RegExp(`^HYPR\\(${KC_PATTERN}\\)`), result: (p1) => `LCTL(LSFT(LALT(LGUI(${p1}))))`},
+  { pattern: new RegExp(`^MEH\\(${KC_PATTERN}\\)`), result: (p1) => `LCTL(LSFT(LALT(${p1})))`},
+  { pattern: new RegExp(`^LCAG\\(${KC_PATTERN}\\)`), result: (p1) => `LCTL(LALT(LGUI(${p1})))`},
+  { pattern: new RegExp(`^SGUI\\(${KC_PATTERN}\\)`), result: (p1) => `LGUI(LSFT(${p1}))`},
+  { pattern: new RegExp(`^LCA\\(${KC_PATTERN}\\)`), result: (p1) => `LCTL(LALT(${p1}))`},
+  { pattern: new RegExp(`^LSA\\(${KC_PATTERN}\\)`), result: (p1) => `LSFT(LALT(${p1}))`},
+  { pattern: new RegExp(`^RSA\\(${KC_PATTERN}\\)`), result: (p1) => `RSFT(RALT(${p1}))`},
+  { pattern: new RegExp(`^RCS\\(${KC_PATTERN}\\)`), result: (p1) => `RCTL(RSFT(${p1}))`},
+  { pattern: new RegExp(`^LCG\\(${KC_PATTERN}\\)`), result: (p1) => `LCTL(LGUI(${p1}))`},
+  { pattern: new RegExp(`^RCG\\(${KC_PATTERN}\\)`), result: (p1) => `RCTL(RGUI(${p1}))`},
+  { pattern: new RegExp(`^LT([0-9]+)\\(${KC_PATTERN}\\)`), result: (p1, p2) => `LT(${p1}, ${p2})`},
+];
 
-    if (json.layout && Array.isArray(json.layout)) {
-      json.layout.forEach((layouts, layoutIndex) => {
-        if (Array.isArray(layouts)) {
-          ret = "";
-          ret += "[" + layoutIndex + "] = LAYOUT(\n";
-          rowStrings = [];
-          layouts.forEach((rows, rowIndex) => {
-            if (Array.isArray(rows)) {
-              rowStrings.push(
-                (
-                  // omit -1
-                  rows.filter((col) => col != -1)
-                )
-                .join(", ")
-              );
-            }
-          });
-          ret += rowStrings.join(",\n");
-          ret += "\n)";
-          rets.push(ret);
-        }
-      });
-    } else {
-      console.warn("layout is not found in JSON");
-    }
+const resolveAlias = (key) => KC_ALIASES[key] || key
 
-    var ret = rets.join(",\n");
+const translateKeycode = (keycode) => keyCodePattern
+  .reduce((acc, { pattern, result }) => acc.replace(pattern, (_, p1, p2) => result(p1, p2)), keycode)
 
-    // translate keycodes from Vial to QMK
-    Object.keys(KC_ALIASES).forEach((key) => {
-      ret = ret.replaceAll(key, KC_ALIASES[key]);
-    });
+const template = (keymap) => `/* SPDX-License-Identifier: GPL-2.0-or-later */
+#include QMK_KEYBOARD_H
 
-    // translate LTn(...) to LT(n, ...)
-    const pattern = /LT([0-9])\(/g;
-    ret = ret.replaceAll(pattern, "LT($1,");
+const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
+${keymap}
+};
+`
 
-    return ret;
-  } catch (error) {
-    console.warn(error);
-    throw new Error(error.message, { cause: error });
+const vial2c = (json) => {
+  if (!json.layout || !Array.isArray(json.layout)) {
+    console.warn("Layout is not found or not in the correct format.");
+    return "";
   }
+
+  const keymap = json.layout
+    .map((layout, layoutIndex) => {
+      if (!Array.isArray(layout)) return null;
+
+      const rows = layout
+        .map((row) => {
+          const codes =
+            Array.isArray(row) ?
+              row.filter((col) => col !== -1).map(translateKeycode).join(", ") : ""
+          return `\t\t${codes}`
+        })
+        .join(",\n");
+
+      return `\t[${layoutIndex}] = LAYOUT(\n${rows}\n\t)`;
+    })
+    .filter(Boolean)
+    .join(",\n");
+
+  return template(keymap)
 }
